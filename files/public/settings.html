@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings // THE ARCHIVE</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; }
+        .settings-card { padding: 28px; }
+        .settings-card h3 { display: flex; align-items: center; gap: 10px; font-size: 1.1rem; margin-bottom: 20px; }
+        .settings-card h3 span { font-size: 1.3rem; }
+        
+        .status-box { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: var(--radius-sm); margin-bottom: 20px; }
+        .status-box.ok { background: rgba(16,185,129,0.1); }
+        .status-box.off { background: rgba(245,158,11,0.1); }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .status-box.ok .status-dot { background: var(--success); box-shadow: 0 0 0 3px rgba(16,185,129,0.2); }
+        .status-box.off .status-dot { background: var(--warning); }
+        .status-info strong { display: block; font-size: 0.95rem; margin-bottom: 2px; }
+        .status-info span { font-size: 0.85rem; color: var(--ink-light); }
+        
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-light); }
+        .data-item { text-align: center; padding: 16px; background: var(--paper-warm); border-radius: var(--radius-sm); }
+        .data-item .val { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .data-item .lbl { font-size: 0.8rem; color: var(--ink-light); margin-top: 4px; }
+        
+        .danger { margin-top: 20px; padding: 16px; background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius-sm); }
+        .danger h4 { font-size: 0.9rem; color: var(--danger); margin-bottom: 8px; }
+        .danger p { font-size: 0.85rem; color: var(--ink-light); margin-bottom: 12px; }
+        
+        .about { text-align: center; padding: 40px 20px; }
+        .about-logo { width: 72px; height: 72px; margin: 0 auto 16px; background: var(--ink); border-radius: 18px; display: flex; align-items: center; justify-content: center; }
+        .about-logo span { font-family: var(--font-display); font-size: 2rem; font-weight: 700; color: white; }
+        .about h3 { font-family: var(--font-display); font-size: 1.4rem; margin-bottom: 4px; }
+        .about .ver { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink-light); margin-bottom: 16px; }
+        .about p { font-size: 0.9rem; color: var(--ink-light); line-height: 1.7; }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <div class="nav-brand"><span class="brand-serif">THE ARCHIVE</span><span class="brand-sub">PSAT MASTERY SYSTEM</span></div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="solve.html" class="nav-link">Solve</a>
+            <a href="stats.html" class="nav-link">Analytics</a>
+            <a href="history.html" class="nav-link">Records</a>
+            <a href="settings.html" class="nav-link active">Settings</a>
+        </div>
+        <div class="nav-status"><span class="status-dot" id="statusDot"></span><span class="status-text" id="statusText">Syncing...</span></div>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div class="header-tag">Configuration</div>
+            <h1 class="page-title">Settings</h1>
+            <p class="page-subtitle">앱 설정 및 데이터 관리</p>
+        </header>
+
+        <div class="settings-grid">
+            <div class="card settings-card">
+                <h3><span>🔥</span> Firebase</h3>
+                <div class="status-box" id="fbStatus">
+                    <div class="status-dot"></div>
+                    <div class="status-info">
+                        <strong id="fbTitle">Checking...</strong>
+                        <span id="fbDesc">연결 상태 확인 중</span>
+                    </div>
+                </div>
+                <p style="font-size:0.9rem;color:var(--ink-light);line-height:1.7">Firebase가 하드코딩으로 설정되어 있어 자동으로 실시간 동기화됩니다.</p>
+                <div class="data-grid">
+                    <div class="data-item"><div class="val" id="dSessions">0</div><div class="lbl">저장된 세션</div></div>
+                    <div class="data-item"><div class="val" id="dKeys">0</div><div class="lbl">정답 키</div></div>
+                </div>
+            </div>
+
+            <div class="card settings-card">
+                <h3><span>💾</span> Data</h3>
+                <div class="form-group"><button class="btn btn-secondary btn-block" onclick="exportAll()">📥 전체 데이터 내보내기 (JSON)</button></div>
+                <div class="form-group"><button class="btn btn-secondary btn-block" onclick="document.getElementById('importFile').click()">📤 데이터 가져오기 (JSON)</button><input type="file" id="importFile" accept=".json" style="display:none"></div>
+                <div class="danger">
+                    <h4>⚠️ Danger Zone</h4>
+                    <p>모든 학습 기록과 정답 키가 영구 삭제됩니다.</p>
+                    <button class="btn btn-danger btn-block" onclick="clearAll()">🗑️ 모든 데이터 삭제</button>
+                </div>
+            </div>
+
+            <div class="card settings-card">
+                <div class="about">
+                    <div class="about-logo"><span>A</span></div>
+                    <h3>THE ARCHIVE</h3>
+                    <p class="ver">PSAT Mastery System v4.0</p>
+                    <p>PSAT 기출문제 학습을 위한 아카이브 시스템입니다.<br>AI 답안 추출, Firebase 실시간 동기화,<br>고급 통계 시각화를 지원합니다.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            setTimeout(loadSettings, 200);
+            document.getElementById('importFile').addEventListener('change', importData);
+        });
+        
+        function loadSettings() {
+            const box = document.getElementById('fbStatus');
+            const title = document.getElementById('fbTitle');
+            const desc = document.getElementById('fbDesc');
+            
+            if (isConnected) {
+                box.className = 'status-box ok';
+                title.textContent = 'Connected';
+                desc.textContent = '실시간 동기화 활성화됨';
+            } else {
+                box.className = 'status-box off';
+                title.textContent = 'Offline';
+                desc.textContent = '로컬 저장소 사용 중';
+            }
+            
+            document.getElementById('dSessions').textContent = historyData.length;
+            document.getElementById('dKeys').textContent = Object.keys(answerKeys).length;
+        }
+        
+        function exportAll() {
+            const data = { history: historyData, answerKeys, exportDate: new Date().toISOString(), version: '4.0' };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `psat_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            showToast('데이터 내보내기 완료', 'success');
+        }
+        
+        function importData(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (data.history) { historyData = data.history; localStorage.setItem('psatHistory', JSON.stringify(historyData)); }
+                    if (data.answerKeys) { answerKeys = data.answerKeys; localStorage.setItem('psatAnswerKeys', JSON.stringify(answerKeys)); }
+                    loadSettings();
+                    showToast('데이터 가져오기 완료!', 'success');
+                } catch { showToast('잘못된 파일 형식', 'error'); }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        }
+        
+        function clearAll() {
+            if (!confirm('정말 모든 데이터를 삭제하시겠습니까?')) return;
+            if (!confirm('마지막 확인: 되돌릴 수 없습니다.')) return;
+            historyData = []; answerKeys = {};
+            localStorage.removeItem('psatHistory');
+            localStorage.removeItem('psatAnswerKeys');
+            loadSettings();
+            showToast('모든 데이터 삭제됨', 'success');
+        }
+    </script>
+</body>
+</html>

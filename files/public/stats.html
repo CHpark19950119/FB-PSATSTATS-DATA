@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics // THE ARCHIVE</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .stats-hero {
+            background: linear-gradient(135deg, var(--ink), #333);
+            border-radius: var(--radius-xl);
+            padding: 48px;
+            color: white;
+            margin-bottom: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .stats-hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 50%;
+            height: 200%;
+            background: radial-gradient(ellipse, rgba(99,102,241,0.15), transparent 70%);
+        }
+        .hero-label { font-size: 0.85rem; opacity: 0.7; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.1em; }
+        .hero-big { font-family: var(--font-display); font-size: 5rem; font-weight: 700; line-height: 1; }
+        .hero-sub { font-size: 1rem; opacity: 0.8; margin-top: 8px; }
+        
+        .bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .bento-2 { grid-column: span 2; }
+        .bento-3 { grid-column: span 3; }
+        
+        @media (max-width: 1000px) { .bento { grid-template-columns: repeat(2, 1fr); } .bento-3 { grid-column: span 2; } }
+        @media (max-width: 600px) { .bento { grid-template-columns: 1fr; } .bento-2, .bento-3 { grid-column: span 1; } }
+        
+        .stat-card { display: flex; flex-direction: column; }
+        .stat-card .stat-icon { font-size: 1.5rem; margin-bottom: 12px; }
+        .stat-card .stat-value { font-family: var(--font-display); font-size: 2.5rem; font-weight: 700; line-height: 1; }
+        .stat-card .stat-label { font-size: 0.85rem; color: var(--ink-light); margin-top: 8px; }
+        
+        .chart-card { min-height: 300px; }
+        .chart-card h3 { font-size: 1rem; margin-bottom: 20px; }
+        .chart-wrap { height: 220px; position: relative; }
+        
+        .radial-wrap { display: flex; justify-content: center; align-items: center; flex-direction: column; padding: 20px 0; }
+        .radial { position: relative; width: 140px; height: 140px; }
+        .radial svg { transform: rotate(-90deg); }
+        .radial-bg { fill: none; stroke: var(--border-light); stroke-width: 10; }
+        .radial-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+        .radial-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+        .radial-val { font-family: var(--font-display); font-size: 1.75rem; font-weight: 700; }
+        .radial-lbl { font-size: 0.75rem; color: var(--ink-light); }
+        
+        .subject-bars { display: flex; flex-direction: column; gap: 16px; }
+        .subject-row { display: flex; align-items: center; gap: 12px; }
+        .subject-row .icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-size: 1.1rem; }
+        .subject-row .icon.lang { background: rgba(59,130,246,0.1); }
+        .subject-row .icon.data { background: rgba(139,92,246,0.1); }
+        .subject-row .icon.situ { background: rgba(16,185,129,0.1); }
+        .subject-row .info { flex: 1; }
+        .subject-row .name { font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; }
+        .subject-row .bar { height: 8px; background: var(--border-light); border-radius: 10px; overflow: hidden; }
+        .subject-row .bar-fill { height: 100%; border-radius: 10px; }
+        .subject-row .bar-fill.lang { background: linear-gradient(90deg, var(--language), #60A5FA); }
+        .subject-row .bar-fill.data { background: linear-gradient(90deg, var(--data), #A78BFA); }
+        .subject-row .bar-fill.situ { background: linear-gradient(90deg, var(--situation), #34D399); }
+        .subject-row .stats { text-align: right; min-width: 70px; }
+        .subject-row .acc { font-family: var(--font-mono); font-weight: 700; font-size: 1.1rem; }
+        .subject-row .cnt { font-size: 0.75rem; color: var(--ink-light); }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <div class="nav-brand"><span class="brand-serif">THE ARCHIVE</span><span class="brand-sub">PSAT MASTERY SYSTEM</span></div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="solve.html" class="nav-link">Solve</a>
+            <a href="stats.html" class="nav-link active">Analytics</a>
+            <a href="history.html" class="nav-link">Records</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+        <div class="nav-status"><span class="status-dot" id="statusDot"></span><span class="status-text" id="statusText">Syncing...</span></div>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div class="header-tag">Deep Insights</div>
+            <h1 class="page-title">Analytics</h1>
+            <p class="page-subtitle">학습 데이터를 분석하고 성장을 시각화하세요</p>
+        </header>
+
+        <div class="stats-hero">
+            <div class="hero-label">Overall Accuracy</div>
+            <div class="hero-big" id="heroAcc">0%</div>
+            <div class="hero-sub" id="heroSub">총 0문제 중 0문제 정답</div>
+        </div>
+
+        <div class="bento">
+            <div class="card stat-card"><div class="stat-icon">📚</div><div class="stat-value" id="statSessions">0</div><div class="stat-label">총 세션</div></div>
+            <div class="card stat-card"><div class="stat-icon">✏️</div><div class="stat-value" id="statQuestions">0</div><div class="stat-label">푼 문제</div></div>
+            <div class="card stat-card"><div class="stat-icon">⏱</div><div class="stat-value" id="statHours">0h</div><div class="stat-label">학습 시간</div></div>
+            <div class="card stat-card"><div class="stat-icon">🔥</div><div class="stat-value" id="statStreak">0</div><div class="stat-label">연속 학습일</div></div>
+            
+            <div class="card bento-2 chart-card"><h3>📈 정답률 추이 (최근 15회)</h3><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
+            
+            <div class="card"><h3>📝 언어논리</h3><div class="radial-wrap"><div class="radial"><svg width="140" height="140"><circle class="radial-bg" cx="70" cy="70" r="60"/><circle class="radial-fill" id="radLang" cx="70" cy="70" r="60" stroke="#3B82F6" stroke-dasharray="377" stroke-dashoffset="377"/></svg><div class="radial-center"><div class="radial-val" id="valLang">--%</div><div class="radial-lbl" id="lblLang">0문제</div></div></div></div></div>
+            <div class="card"><h3>📊 자료해석</h3><div class="radial-wrap"><div class="radial"><svg width="140" height="140"><circle class="radial-bg" cx="70" cy="70" r="60"/><circle class="radial-fill" id="radData" cx="70" cy="70" r="60" stroke="#8B5CF6" stroke-dasharray="377" stroke-dashoffset="377"/></svg><div class="radial-center"><div class="radial-val" id="valData">--%</div><div class="radial-lbl" id="lblData">0문제</div></div></div></div></div>
+            
+            <div class="card bento-2"><h3>🎯 과목별 현황</h3><div class="subject-bars" id="subjectBars"></div></div>
+            
+            <div class="card"><h3>🧩 상황판단</h3><div class="radial-wrap"><div class="radial"><svg width="140" height="140"><circle class="radial-bg" cx="70" cy="70" r="60"/><circle class="radial-fill" id="radSitu" cx="70" cy="70" r="60" stroke="#10B981" stroke-dasharray="377" stroke-dashoffset="377"/></svg><div class="radial-center"><div class="radial-val" id="valSitu">--%</div><div class="radial-lbl" id="lblSitu">0문제</div></div></div></div></div>
+            <div class="card chart-card"><h3>📍 학습 장소</h3><div class="chart-wrap"><canvas id="locChart"></canvas></div></div>
+            
+            <div class="card bento-3 chart-card"><h3>📋 시험 유형별 성적</h3><div class="chart-wrap"><canvas id="typeChart"></canvas></div></div>
+            <div class="card chart-card"><h3>📅 년도별 분포</h3><div class="chart-wrap"><canvas id="yearChart"></canvas></div></div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        let charts = {};
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            setTimeout(loadAnalytics, 200);
+        });
+        
+        function loadAnalytics() {
+            const s = calculateStats();
+            
+            document.getElementById('heroAcc').textContent = `${s.avgAccuracy}%`;
+            document.getElementById('heroSub').textContent = `총 ${s.totalQuestions}문제 중 ${s.totalCorrect}문제 정답`;
+            document.getElementById('statSessions').textContent = s.totalSessions;
+            document.getElementById('statQuestions').textContent = s.totalQuestions;
+            document.getElementById('statHours').textContent = `${Math.round(s.totalTimeSeconds/3600*10)/10}h`;
+            document.getElementById('statStreak').textContent = s.streak;
+            
+            updateRadials(s.bySubject);
+            updateSubjectBars(s.bySubject);
+            createTrendChart();
+            createLocationChart(s.byLocation);
+            createTypeChart(s.byExamType);
+            createYearChart(s.byYear);
+        }
+        
+        function updateRadials(by) {
+            const subs = [['언어논리','Lang','#3B82F6'], ['자료해석','Data','#8B5CF6'], ['상황판단','Situ','#10B981']];
+            subs.forEach(([name, id]) => {
+                const d = by[name] || { total: 0, correct: 0 };
+                const acc = d.total > 0 ? Math.round(d.correct/d.total*100) : 0;
+                const circ = 377, offset = circ - (acc/100)*circ;
+                const el = document.getElementById(`rad${id}`);
+                if (el) setTimeout(() => el.style.strokeDashoffset = offset, 100);
+                const v = document.getElementById(`val${id}`), l = document.getElementById(`lbl${id}`);
+                if (v) v.textContent = `${acc}%`;
+                if (l) l.textContent = `${d.total}문제`;
+            });
+        }
+        
+        function updateSubjectBars(by) {
+            const c = document.getElementById('subjectBars');
+            const subs = [['언어논리','📝','lang'], ['자료해석','📊','data'], ['상황판단','🧩','situ']];
+            c.innerHTML = subs.map(([name, icon, cls]) => {
+                const d = by[name] || { total: 0, correct: 0, sessions: 0 };
+                const acc = d.total > 0 ? Math.round(d.correct/d.total*100) : 0;
+                return `<div class="subject-row"><div class="icon ${cls}">${icon}</div><div class="info"><div class="name">${name}</div><div class="bar"><div class="bar-fill ${cls}" style="width:${acc}%"></div></div></div><div class="stats"><div class="acc">${acc}%</div><div class="cnt">${d.total}문제 · ${d.sessions}회</div></div></div>`;
+            }).join('');
+        }
+        
+        function createTrendChart() {
+            const recent = historyData.slice(0,15).reverse();
+            const ctx = document.getElementById('trendChart');
+            if (charts.trend) charts.trend.destroy();
+            charts.trend = new Chart(ctx, {
+                type: 'line',
+                data: { labels: recent.map((_,i) => i+1), datasets: [{ data: recent.map(h => h.accuracy), borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#6366F1' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { display: false } } } }
+            });
+        }
+        
+        function createLocationChart(by) {
+            const ctx = document.getElementById('locChart');
+            if (charts.loc) charts.loc.destroy();
+            charts.loc = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: Object.keys(by), datasets: [{ data: Object.values(by), backgroundColor: ['#6366F1','#8B5CF6','#10B981','#F59E0B','#EF4444'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
+            });
+        }
+        
+        function createTypeChart(by) {
+            const labels = Object.keys(by);
+            const accs = labels.map(l => by[l].total > 0 ? Math.round(by[l].correct/by[l].total*100) : 0);
+            const counts = labels.map(l => by[l].sessions);
+            const ctx = document.getElementById('typeChart');
+            if (charts.type) charts.type.destroy();
+            charts.type = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: '정답률 (%)', data: accs, backgroundColor: '#6366F1', borderRadius: 6, yAxisID: 'y' }, { label: '세션 수', data: counts, backgroundColor: 'rgba(245,158,11,0.5)', borderRadius: 6, yAxisID: 'y1' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, max: 100, position: 'left' }, y1: { beginAtZero: true, position: 'right', grid: { display: false } }, x: { grid: { display: false } } } }
+            });
+        }
+        
+        function createYearChart(by) {
+            const labels = Object.keys(by).sort();
+            const counts = labels.map(l => by[l].sessions);
+            const ctx = document.getElementById('yearChart');
+            if (charts.year) charts.year.destroy();
+            charts.year = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ data: counts, backgroundColor: '#10B981', borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+            });
+        }
+    </script>
+</body>
+</html>

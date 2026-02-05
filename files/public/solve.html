@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solve // THE ARCHIVE</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .solve-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        
+        @media (max-width: 1000px) {
+            .solve-layout { grid-template-columns: 1fr; }
+        }
+        
+        .solve-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: sticky;
+            top: 100px;
+        }
+        
+        @media (max-width: 1000px) {
+            .solve-sidebar {
+                position: static;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            }
+        }
+        
+        /* Timer */
+        .timer-card { text-align: center; }
+        
+        .timer-display {
+            padding: 28px;
+            background: linear-gradient(135deg, var(--paper-warm), var(--border-light));
+            border-radius: var(--radius-md);
+            margin-bottom: 16px;
+        }
+        
+        .timer-time {
+            font-family: var(--font-mono);
+            font-size: 2.75rem;
+            font-weight: 600;
+            color: var(--ink);
+            letter-spacing: 0.05em;
+        }
+        
+        .timer-label {
+            font-size: 0.8rem;
+            color: var(--ink-light);
+            margin-top: 6px;
+        }
+        
+        .timer-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        /* Session Tags */
+        .session-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+        }
+        
+        .session-tag {
+            padding: 6px 12px;
+            background: var(--paper-warm);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        /* Answer Section */
+        .answer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .count-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .count-control label {
+            font-size: 0.9rem;
+            color: var(--ink-light);
+            font-weight: 500;
+        }
+        
+        .count-control input {
+            width: 70px;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-weight: 600;
+        }
+        
+        /* Answer Grid - 완전히 새로운 디자인 */
+        .answer-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+        
+        @media (max-width: 800px) {
+            .answer-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        
+        @media (max-width: 600px) {
+            .answer-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        
+        @media (max-width: 450px) {
+            .answer-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        .answer-item {
+            background: var(--paper);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        
+        .answer-item:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .answer-num {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--ink-muted);
+            margin-bottom: 8px;
+        }
+        
+        .answer-btns {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .ans-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--paper-warm);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--ink-light);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .ans-btn:hover {
+            background: var(--border-light);
+            border-color: var(--ink-light);
+            color: var(--ink);
+        }
+        
+        .ans-btn.selected {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .ans-btn.correct {
+            background: var(--success) !important;
+            border-color: var(--success) !important;
+            color: white !important;
+        }
+        
+        .ans-btn.wrong {
+            background: var(--danger) !important;
+            border-color: var(--danger) !important;
+            color: white !important;
+        }
+        
+        /* Action Bar */
+        .action-bar {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .action-bar .btn { flex: 1; }
+        
+        /* Results Panel */
+        .results-panel {
+            display: none;
+            margin-top: 24px;
+            padding: 28px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(16, 185, 129, 0.1));
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: var(--radius-lg);
+        }
+        
+        .results-panel.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .results-score {
+            font-family: var(--font-display);
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--success);
+            line-height: 1;
+        }
+        
+        .results-grade {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 700;
+            padding: 12px 24px;
+            background: white;
+            border-radius: var(--radius-md);
+        }
+        
+        .results-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .result-stat {
+            text-align: center;
+            padding: 16px;
+            background: white;
+            border-radius: var(--radius-sm);
+        }
+        
+        .result-stat-value {
+            font-family: var(--font-mono);
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .result-stat-value.success { color: var(--success); }
+        .result-stat-value.danger { color: var(--danger); }
+        .result-stat-value.primary { color: var(--primary); }
+        
+        .result-stat-label {
+            font-size: 0.8rem;
+            color: var(--ink-light);
+            margin-top: 4px;
+        }
+        
+        .wrong-list {
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        
+        .wrong-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--danger);
+            margin-bottom: 10px;
+        }
+        
+        .wrong-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+        }
+        
+        .wrong-num {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .wrong-ans .user { color: var(--danger); font-weight: 600; }
+        .wrong-ans .correct { color: var(--success); font-weight: 600; }
+        
+        /* Answer Key Section */
+        .answer-key-section { margin-top: 24px; }
+        
+        .key-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .key-toggle:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.15));
+        }
+        
+        .key-toggle h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .toggle-icon {
+            color: var(--primary);
+            transition: transform 0.3s ease;
+        }
+        
+        .key-toggle.open .toggle-icon { transform: rotate(180deg); }
+        
+        .key-content {
+            display: none;
+            padding: 20px;
+            background: var(--paper-warm);
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+        }
+        
+        .key-content.show { display: block; }
+        
+        /* AI Upload */
+        .ai-upload {
+            padding: 24px;
+            background: white;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-md);
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+        }
+        
+        .ai-upload:hover {
+            border-color: var(--primary);
+        }
+        
+        .ai-upload h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+        
+        .ai-upload p {
+            font-size: 0.85rem;
+            color: var(--ink-light);
+            margin-bottom: 16px;
+        }
+        
+        .upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 100px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .upload-btn:hover { background: var(--secondary); }
+        .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .ai-status {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: var(--primary);
+        }
+        
+        .divider {
+            text-align: center;
+            color: var(--ink-muted);
+            font-size: 0.85rem;
+            margin: 16px 0;
+        }
+        
+        /* Key Grid */
+        .key-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+        
+        @media (max-width: 800px) {
+            .key-grid { grid-template-columns: repeat(8, 1fr); }
+        }
+        
+        @media (max-width: 600px) {
+            .key-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+        
+        .key-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .key-item label {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--ink-muted);
+        }
+        
+        .key-item select {
+            width: 44px;
+            padding: 6px 2px;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .key-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        @media (max-width: 600px) {
+            .results-stats { grid-template-columns: 1fr; }
+            .results-header { flex-direction: column; gap: 12px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <div class="nav-brand">
+            <span class="brand-serif">THE ARCHIVE</span>
+            <span class="brand-sub">PSAT MASTERY SYSTEM</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="solve.html" class="nav-link active">Solve</a>
+            <a href="stats.html" class="nav-link">Analytics</a>
+            <a href="history.html" class="nav-link">Records</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+        <div class="nav-status">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-text" id="statusText">Syncing...</span>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div class="header-tag">Cognitive Training</div>
+            <h1 class="page-title">문제 풀이</h1>
+            <p class="page-subtitle">집중하고, 기록하고, 성장하세요</p>
+        </header>
+
+        <div class="solve-layout">
+            <aside class="solve-sidebar">
+                <div class="card timer-card">
+                    <div class="card-header"><h3 class="card-title">⏱️ Timer</h3></div>
+                    <div class="timer-display">
+                        <div class="timer-time" id="timerDisplay">00:00:00</div>
+                        <div class="timer-label">Elapsed Time</div>
+                    </div>
+                    <div class="timer-controls">
+                        <button class="btn btn-primary btn-sm" id="timerToggle" onclick="toggleTimer()">▶ Start</button>
+                        <button class="btn btn-secondary btn-sm" onclick="resetTimer()">↻ Reset</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">📋 Session</h3></div>
+                    <div class="form-group">
+                        <label class="form-label">장소</label>
+                        <select class="form-select" id="location">
+                            <option value="집">🏠 집</option>
+                            <option value="학교">🏫 학교</option>
+                            <option value="도서관">📚 도서관</option>
+                            <option value="카페">☕ 카페</option>
+                            <option value="기타">📍 기타</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">과목</label>
+                        <select class="form-select" id="subject">
+                            <option value="언어논리">📝 언어논리</option>
+                            <option value="자료해석">📊 자료해석</option>
+                            <option value="상황판단">🧩 상황판단</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">시험 유형</label>
+                        <select class="form-select" id="examType">
+                            <option value="5급">5급 공채</option>
+                            <option value="7급">7급 공채</option>
+                            <option value="민경채">민간경력채용</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0">
+                        <label class="form-label">년도</label>
+                        <select class="form-select" id="year"></select>
+                    </div>
+                    <div class="session-tags" id="sessionTags"></div>
+                </div>
+            </aside>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">답안 입력</h3>
+                    <span class="card-badge" id="statusBadge">Standby</span>
+                </div>
+                
+                <div class="answer-header">
+                    <div class="count-control">
+                        <label>문항 수</label>
+                        <input type="number" class="form-input" id="questionCount" value="40" min="1" max="100">
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="clearAnswers()">✕ Clear</button>
+                </div>
+                
+                <div class="answer-grid" id="answerGrid"></div>
+                
+                <div class="action-bar">
+                    <button class="btn btn-success" onclick="submitAnswers()">✓ 채점하기</button>
+                    <button class="btn btn-primary" onclick="saveSessionUI()">💾 저장하기</button>
+                </div>
+                
+                <div class="results-panel" id="resultsPanel">
+                    <div class="results-header">
+                        <div>
+                            <div style="font-size:0.85rem;color:var(--ink-light);margin-bottom:4px">Result</div>
+                            <div class="results-score" id="resultsScore">0%</div>
+                        </div>
+                        <div class="results-grade" id="resultsGrade">--</div>
+                    </div>
+                    <div class="results-stats">
+                        <div class="result-stat">
+                            <div class="result-stat-value success" id="correctCount">0</div>
+                            <div class="result-stat-label">정답</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-value danger" id="wrongCount">0</div>
+                            <div class="result-stat-label">오답</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-value primary" id="timeSpent">00:00</div>
+                            <div class="result-stat-label">소요시간</div>
+                        </div>
+                    </div>
+                    <div class="wrong-list" id="wrongList"></div>
+                </div>
+                
+                <div class="answer-key-section">
+                    <div class="key-toggle" id="keyToggle" onclick="toggleAnswerKey()">
+                        <h3>🔑 정답 키 설정</h3>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="key-content" id="keyContent">
+                        <div class="ai-upload">
+                            <h4>🤖 AI 자동 추출</h4>
+                            <p>답안지 사진을 업로드하면 AI가 자동으로 정답을 추출합니다</p>
+                            <input type="file" id="aiUploadInput" accept="image/*" style="display:none">
+                            <button class="upload-btn" id="aiUploadBtn">📷 이미지 업로드</button>
+                            <div class="ai-status" id="aiStatus"></div>
+                        </div>
+                        <div class="divider">— 또는 직접 입력 —</div>
+                        <div class="key-grid" id="keyGrid"></div>
+                        <div class="key-actions">
+                            <button class="btn btn-primary btn-sm" onclick="saveAnswerKeyUI()">저장</button>
+                            <button class="btn btn-secondary btn-sm" onclick="loadAnswerKeyUI()">불러오기</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script src="solve.js"></script>
+</body>
+</html>

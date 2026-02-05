@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Records // THE ARCHIVE</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; }
+        .filters select { min-width: 130px; }
+        
+        .table-card { padding: 0; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 16px 20px; text-align: left; border-bottom: 1px solid var(--border-light); }
+        th { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-light); background: var(--paper-warm); }
+        tbody tr:hover { background: var(--paper-warm); }
+        
+        .date-cell { display: flex; flex-direction: column; }
+        .date-main { font-weight: 500; }
+        .date-time { font-size: 0.75rem; color: var(--ink-light); }
+        
+        .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 100px; font-size: 0.8rem; font-weight: 500; }
+        .pill.lang { background: rgba(59,130,246,0.1); color: var(--language); }
+        .pill.data { background: rgba(139,92,246,0.1); color: var(--data); }
+        .pill.situ { background: rgba(16,185,129,0.1); color: var(--situation); }
+        
+        .score { font-family: var(--font-mono); font-weight: 600; padding: 5px 14px; border-radius: 100px; }
+        .score.high { background: rgba(16,185,129,0.1); color: var(--success); }
+        .score.mid { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .score.low { background: rgba(239,68,68,0.1); color: var(--danger); }
+        
+        .time-cell { font-family: var(--font-mono); color: var(--ink-light); }
+        
+        .del-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; opacity: 0.4; border-radius: 6px; transition: all 0.2s; }
+        .del-btn:hover { opacity: 1; background: rgba(239,68,68,0.1); }
+        
+        .empty { text-align: center; padding: 60px; color: var(--ink-light); }
+        .empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.3; }
+        
+        .pagination { display: flex; justify-content: center; gap: 6px; padding: 20px; border-top: 1px solid var(--border-light); }
+        .page-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--paper-warm); border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-mono); font-weight: 600; cursor: pointer; }
+        .page-btn:hover { background: white; }
+        .page-btn.active { background: var(--ink); color: white; border-color: var(--ink); }
+        
+        @media (max-width: 800px) {
+            th:nth-child(2), td:nth-child(2), th:nth-child(6), td:nth-child(6) { display: none; }
+        }
+        @media (max-width: 600px) {
+            th:nth-child(4), td:nth-child(4) { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <div class="nav-brand"><span class="brand-serif">THE ARCHIVE</span><span class="brand-sub">PSAT MASTERY SYSTEM</span></div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="solve.html" class="nav-link">Solve</a>
+            <a href="stats.html" class="nav-link">Analytics</a>
+            <a href="history.html" class="nav-link active">Records</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+        <div class="nav-status"><span class="status-dot" id="statusDot"></span><span class="status-text" id="statusText">Syncing...</span></div>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div class="header-tag">Historical Data</div>
+            <h1 class="page-title">Records</h1>
+            <p class="page-subtitle">모든 학습 기록을 확인하고 관리하세요</p>
+        </header>
+
+        <div class="controls">
+            <div class="filters">
+                <select class="form-select" id="filterSubject"><option value="">전체 과목</option><option value="언어논리">언어논리</option><option value="자료해석">자료해석</option><option value="상황판단">상황판단</option></select>
+                <select class="form-select" id="filterType"><option value="">전체 유형</option><option value="5급">5급</option><option value="7급">7급</option><option value="민경채">민경채</option></select>
+                <select class="form-select" id="filterLoc"><option value="">전체 장소</option><option value="집">집</option><option value="학교">학교</option><option value="도서관">도서관</option><option value="카페">카페</option><option value="기타">기타</option></select>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">📥 CSV Export</button>
+        </div>
+
+        <div class="card table-card">
+            <table>
+                <thead><tr><th>Date</th><th>Location</th><th>Subject</th><th>Type / Year</th><th>Score</th><th>Time</th><th></th></tr></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+            <div class="empty" id="empty" style="display:none"><div class="empty-icon">📋</div><p>학습 기록이 없습니다</p></div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        let filtered = [], page = 1;
+        const perPage = 12;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            setTimeout(() => { applyFilters(); setupFilters(); }, 200);
+        });
+        
+        function setupFilters() {
+            ['filterSubject','filterType','filterLoc'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
+        }
+        
+        function applyFilters() {
+            const sub = document.getElementById('filterSubject').value;
+            const type = document.getElementById('filterType').value;
+            const loc = document.getElementById('filterLoc').value;
+            filtered = historyData.filter(h => (!sub || h.subject === sub) && (!type || h.examType === type) && (!loc || h.location === loc));
+            page = 1;
+            render();
+        }
+        
+        function render() {
+            const body = document.getElementById('tableBody');
+            const empty = document.getElementById('empty');
+            const pag = document.getElementById('pagination');
+            
+            if (!filtered.length) { body.innerHTML = ''; empty.style.display = 'block'; pag.innerHTML = ''; return; }
+            empty.style.display = 'none';
+            
+            const start = (page-1)*perPage;
+            const data = filtered.slice(start, start+perPage);
+            const cls = { '언어논리':'lang', '자료해석':'data', '상황판단':'situ' };
+            const emoji = { '언어논리':'📝', '자료해석':'📊', '상황판단':'🧩' };
+            
+            body.innerHTML = data.map(h => {
+                const d = new Date(h.timestamp);
+                const sc = h.accuracy >= 80 ? 'high' : h.accuracy >= 60 ? 'mid' : 'low';
+                const idx = historyData.indexOf(h);
+                return `<tr>
+                    <td><div class="date-cell"><span class="date-main">${d.toLocaleDateString('ko-KR')}</span><span class="date-time">${d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</span></div></td>
+                    <td>${h.location}</td>
+                    <td><span class="pill ${cls[h.subject]}">${emoji[h.subject]} ${h.subject}</span></td>
+                    <td>${h.examType} ${h.year}년</td>
+                    <td><span class="score ${sc}">${h.accuracy}%</span></td>
+                    <td class="time-cell">${formatTime(h.timeSeconds)}</td>
+                    <td><button class="del-btn" onclick="del(${idx})">🗑</button></td>
+                </tr>`;
+            }).join('');
+            
+            const total = Math.ceil(filtered.length/perPage);
+            if (total <= 1) { pag.innerHTML = ''; return; }
+            let html = page > 1 ? `<button class="page-btn" onclick="go(${page-1})">←</button>` : '';
+            for (let i = 1; i <= total; i++) {
+                if (i === 1 || i === total || (i >= page-2 && i <= page+2)) html += `<button class="page-btn ${i===page?'active':''}" onclick="go(${i})">${i}</button>`;
+                else if (i === page-3 || i === page+3) html += '<span style="padding:0 6px">...</span>';
+            }
+            if (page < total) html += `<button class="page-btn" onclick="go(${page+1})">→</button>`;
+            pag.innerHTML = html;
+        }
+        
+        function go(p) { page = p; render(); window.scrollTo({top:0,behavior:'smooth'}); }
+        
+        async function del(idx) {
+            if (!confirm('삭제하시겠습니까?')) return;
+            await deleteSession(idx);
+            applyFilters();
+            showToast('삭제되었습니다.','success');
+        }
+        
+        function exportCSV() {
+            const data = filtered.length ? filtered : historyData;
+            const csv = ['날짜,장소,과목,유형,년도,정답,오답,정답률,시간(초)', ...data.map(h => `${new Date(h.timestamp).toLocaleDateString('ko-KR')},${h.location},${h.subject},${h.examType},${h.year},${h.correct},${h.wrong},${h.accuracy}%,${h.timeSeconds}`)].join('\n');
+            const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `psat_records_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            showToast('CSV 다운로드됨','success');
+        }
+    </script>
+</body>
+</html>

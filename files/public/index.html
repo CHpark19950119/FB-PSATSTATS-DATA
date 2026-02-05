@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE ARCHIVE // PSAT</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="nav-bar">
+        <div class="nav-brand">
+            <span class="brand-serif">THE ARCHIVE</span>
+            <span class="brand-sub">PSAT MASTERY SYSTEM</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link active">Dashboard</a>
+            <a href="solve.html" class="nav-link">Solve</a>
+            <a href="stats.html" class="nav-link">Analytics</a>
+            <a href="history.html" class="nav-link">Records</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+        <div class="nav-status">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-text" id="statusText">Syncing...</span>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div class="header-tag">Overview</div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">오늘의 학습 현황과 성장 추이를 확인하세요</p>
+        </header>
+
+        <section class="hero-stats">
+            <div class="hero-card">
+                <div class="hero-icon">📚</div>
+                <div class="hero-content">
+                    <span class="hero-value" id="todaySessions">0</span>
+                    <span class="hero-label">오늘 세션</span>
+                </div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-icon">✓</div>
+                <div class="hero-content">
+                    <span class="hero-value" id="todayAccuracy">--%</span>
+                    <span class="hero-label">오늘 정답률</span>
+                </div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-icon">⏱</div>
+                <div class="hero-content">
+                    <span class="hero-value" id="todayTime">0분</span>
+                    <span class="hero-label">학습 시간</span>
+                </div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-icon">🔥</div>
+                <div class="hero-content">
+                    <span class="hero-value" id="streak">0일</span>
+                    <span class="hero-label">연속 학습</span>
+                </div>
+            </div>
+        </section>
+
+        <div class="dashboard-grid">
+            <div class="card card-wide">
+                <div class="card-header">
+                    <h3 class="card-title">📈 Weekly Flow</h3>
+                    <span class="card-badge">최근 7일</span>
+                </div>
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:16px">
+                    <span style="font-family:var(--font-display);font-size:3rem;font-weight:700" id="weeklyAccuracy">--</span>
+                    <span style="font-size:1.5rem;color:var(--ink-light)">%</span>
+                </div>
+                <div style="font-size:0.9rem;color:var(--ink-light)">주간 평균 정답률</div>
+            </div>
+
+            <div class="card subject-card">
+                <div class="subject-header">
+                    <h3 class="card-title">📝 언어논리</h3>
+                    <span class="subject-icon"></span>
+                </div>
+                <div class="subject-grade" id="gradeLanguage">--</div>
+                <div class="progress-bar"><div class="progress-fill language" id="progressLanguage" style="width:0%"></div></div>
+                <div class="subject-meta">
+                    <span id="countLanguage">0문제</span>
+                    <span id="accuracyLanguage">--%</span>
+                </div>
+            </div>
+
+            <div class="card subject-card">
+                <div class="subject-header">
+                    <h3 class="card-title">📊 자료해석</h3>
+                </div>
+                <div class="subject-grade" id="gradeData">--</div>
+                <div class="progress-bar"><div class="progress-fill data" id="progressData" style="width:0%"></div></div>
+                <div class="subject-meta">
+                    <span id="countData">0문제</span>
+                    <span id="accuracyData">--%</span>
+                </div>
+            </div>
+
+            <div class="card subject-card">
+                <div class="subject-header">
+                    <h3 class="card-title">🧩 상황판단</h3>
+                </div>
+                <div class="subject-grade" id="gradeSituation">--</div>
+                <div class="progress-bar"><div class="progress-fill situation" id="progressSituation" style="width:0%"></div></div>
+                <div class="subject-meta">
+                    <span id="countSituation">0문제</span>
+                    <span id="accuracySituation">--%</span>
+                </div>
+            </div>
+
+            <div class="card card-wide">
+                <div class="card-header">
+                    <h3 class="card-title">🕐 최근 학습</h3>
+                    <a href="history.html" style="color:var(--primary);text-decoration:none;font-size:0.9rem">전체 보기 →</a>
+                </div>
+                <div class="recent-list" id="recentList">
+                    <div class="empty-state">
+                        <span class="empty-icon">📋</span>
+                        <p>아직 학습 기록이 없습니다</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="quick-action">
+            <a href="solve.html" class="action-btn">문제 풀기 시작 →</a>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            setTimeout(loadDashboardData, 200);
+        });
+    </script>
+</body>
+</html>
